@@ -3,19 +3,49 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ubah file mu</title>
+<title>SEDULUR FOTOCOPY - Kolase Foto</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="stylesheet" href="style.css">
 
 <style>
-  body { font-family: sans-serif; text-align: center; margin: 20px; }
-  canvas { border: 1px solid #ccc; margin-top: 10px; max-width: 90%; height: auto; background: white; }
-  select, input, button { margin: 5px; padding: 6px 10px; font-size: 15px; }
+  body {
+    font-family: "Poppins", sans-serif;
+    text-align: center;
+    margin: 20px;
+    background: #f4f7fb;
+    color: #333;
+  }
+  canvas {
+    border: 1px solid #ccc;
+    margin-top: 10px;
+    max-width: 90%;
+    height: auto;
+    background: white;
+  }
+  select, input, button {
+    margin: 5px;
+    padding: 6px 10px;
+    font-size: 15px;
+    border-radius: 6px;
+  }
+  button {
+    background: #007bff;
+    border: none;
+    color: white;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  button:hover {
+    background: #0056b3;
+  }
+  .option-group {
+    margin: 10px 0;
+  }
 </style>
 </head>
 <body>
 
-<h2>KOLASE FOTO A4 OTOMATIS (Mulai dari Kiri Atas + Margin Cetak)</h2>
+<h2>🖨️ SELAMAT DATANG DI SEDULUR FOTOCOPY</h2>
 
 <label>Ukuran foto:</label>
 <select id="photoSize">
@@ -27,7 +57,16 @@
 <label>Margin (mm):</label>
 <input type="number" id="margin" value="5" min="0" max="20" style="width:60px">
 
+<br>
+
+<label>Pilih foto:</label>
 <input type="file" id="fileInput" multiple accept="image/*">
+
+<div class="option-group">
+  <label><input type="radio" name="mode" value="normal" checked> Gunakan semua foto berbeda</label>
+  <label><input type="radio" name="mode" value="duplicate"> Gandakan foto yang sama di 1 lembar</label>
+</div>
+
 <button id="generate">Buat Kolase</button>
 <button id="download">Download PDF</button>
 
@@ -44,7 +83,6 @@ let pages = [];
 
 const mmToPx = mm => Math.round(mm * 11.811); // konversi mm → pixel (300 DPI)
 
-// Crop tengah supaya tidak gepeng
 function drawImageCover(ctx, img, x, y, w, h) {
   const iw = img.width, ih = img.height;
   const ir = iw / ih, tr = w / h;
@@ -63,7 +101,6 @@ function drawImageCover(ctx, img, x, y, w, h) {
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
 }
 
-// Auto-rotate jika landscape
 async function loadImageRotated(file) {
   return new Promise(resolve => {
     const img = new Image();
@@ -92,8 +129,10 @@ generateBtn.onclick = async () => {
   const marginMM = parseFloat(document.getElementById("margin").value) || 0;
   const margin = mmToPx(marginMM);
 
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+
   let [w, h] = size === "2x3" ? [20, 30] : size === "3x4" ? [30, 40] : [40, 60];
-  const space = 2; // jarak antar foto dalam mm
+  const space = 2; // jarak antar foto (mm)
   const imgW = mmToPx(w);
   const imgH = mmToPx(h);
   const gap = mmToPx(space);
@@ -109,15 +148,24 @@ generateBtn.onclick = async () => {
   const cols = Math.floor((usableW + gap) / (imgW + gap));
   const rows = Math.floor((usableH + gap) / (imgH + gap));
   const perPage = cols * rows;
-  const totalPages = Math.ceil(images.length / perPage);
+
+  const totalImages = mode === "duplicate" ? perPage : images.length;
+  const totalPages = Math.ceil(totalImages / perPage);
 
   for (let p = 0; p < totalPages; p++) {
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const pageImgs = images.slice(p * perPage, (p + 1) * perPage);
+    let pageImgs = [];
+    if (mode === "duplicate") {
+      // gunakan hanya gambar pertama dan duplikasi sampai penuh
+      const firstImg = images[0];
+      for (let i = 0; i < perPage; i++) pageImgs.push(firstImg);
+    } else {
+      // mode normal: ambil urut
+      pageImgs = images.slice(p * perPage, (p + 1) * perPage);
+    }
 
-    // posisi mulai kiri atas sesuai margin
     const startX = margin;
     const startY = margin;
 
@@ -143,7 +191,7 @@ downloadBtn.onclick = () => {
     if (i > 0) pdf.addPage();
     pdf.addImage(img, "JPEG", 0, 0, 210, 297);
   });
-  pdf.save("kolase_foto_a4_kiriatas.pdf");
+  pdf.save("kolase_foto_a4.pdf");
 };
 </script>
 
