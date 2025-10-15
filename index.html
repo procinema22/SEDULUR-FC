@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>A4 Photo Collage Generator</title>
+
+  <!-- Import Google Font Poppins -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Hubungkan CSS -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- jsPDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+
+<body>
+  <div class="container">
+    <h1>A4 Photo Collage Generator</h1>
+    <p>Buat kolase foto ukuran 3x4, 2x3, atau 4x6 cm di atas kertas A4 dengan jarak 2 mm.</p>
+
+    <div class="controls">
+      <label for="size">Pilih ukuran foto:</label>
+      <select id="size">
+        <option value="3x4">3x4 cm</option>
+        <option value="2x3">2x3 cm</option>
+        <option value="4x6">4x6 cm</option>
+      </select>
+
+      <input type="file" id="fileInput" accept="image/*" multiple>
+      <div class="buttons">
+        <button id="previewBtn">Buat Preview</button>
+        <button id="downloadBtn">Download PDF A4</button>
+      </div>
+    </div>
+
+    <h3>Gambar yang diunggah:</h3>
+    <div class="grid" id="thumbs"></div>
+
+    <h3>Preview Hasil:</h3>
+    <div class="preview" id="preview"></div>
+  </div>
+
+  <script>
+    const { jsPDF } = window.jspdf;
+    const A4_MM = { w: 210, h: 297 };
+    const DPI = 300;
+    const MM_PER_INCH = 25.4;
+    const spacingMm = 2;
+    let images = [];
+
+    document.getElementById("fileInput").addEventListener("change", (e) => {
+      images = [];
+      const files = Array.from(e.target.files);
+      const thumbs = document.getElementById("thumbs");
+      thumbs.innerHTML = "";
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          images.push(reader.result);
+          const img = document.createElement("img");
+          img.src = reader.result;
+          thumbs.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+      });
+    });
+
+    function mmToPx(mm) { return Math.round((mm / MM_PER_INCH) * DPI); }
+    function cmToPx(cm) { return mmToPx(cm * 10); }
+
+    function computeCoverCrop(imgW, imgH, targetW, targetH) {
+      const imgRatio = imgW / imgH;
+      const targetRatio = targetW / targetH;
+      if (imgRatio > targetRatio) {
+        const sHeight = imgH;
+        const sWidth = imgH * targetRatio;
+        return { sx: (imgW - sWidth) / 2, sy: 0, sWidth, sHeight };
+      } else {
+        const sWidth = imgW;
+        const sHeight = imgW / targetRatio;
+        return { sx: 0, sy: (imgH - sHeight) / 2, sWidth, sHeight };
+      }
+    }
+
+    async function renderCollage() {
+      if (images.length === 0) { alert("Upload minimal 1 gambar."); return; }
+
+      const size = document.getElementById("size").value;
+      const [wCm, hCm] = size.split("x").map(Number);
+      const canvasW = mmToPx(A4_MM.w);
+      const canvasH = mmToPx(A4_MM.h);
+      const spacingPx = mmToPx(spacingMm);
+      const photoWpx = cmToPx(wCm);
+      const photoHpx = cmToPx(hCm);
+
+      const cols = Math.floor((canvasW + spacingPx) / (photoWpx + spacingPx));
+      const rows = Math.floor((canvasH + spacingPx) / (photoHpx + spacingPx));
+
+      const canvas = document.createElement("canvas");
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvasW, canvasH);
+
+      const usedW = cols * photoWpx + (cols - 1) * spacingPx;
+      const usedH = rows * photoHpx + (rows - 1) * spacingPx;
+      const offsetX = Math.round((canvasW - usedW) / 2);
+      const offsetY = Math.round((canvasH - usedH) / 2);
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const imgSrc = images[(r * cols + c) % images.length];
+          const img = await loadImage(imgSrc);
+          const { sx, sy, sWidth, sHeight } = computeCoverCrop(img.width, img.height, photoWpx, photoHpx);
+          const x = offsetX + c * (photoWpx + spacingPx);
+          const y = offsetY + r * (photoHpx + spacingPx);
+          ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, photoWpx, photoHpx);
+        }
+      }
+      return canvas;
+    }
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    document.getElementById("previewBtn").addEventListener("click", async () => {
+      const canvas = await renderCollage();
+      if (!canvas) return;
+      document.getElementById("preview").innerHTML = "";
+      const img = document.createElement("img");
+      img.src = canvas.toDataURL("image/jpeg", 0.9);
+      document.getElementById("preview").appendChild(img);
+    });
+
+    document.getElementById("downloadBtn").addEventListener("click", async () => {
+      const canvas = await renderCollage();
+      if (!canvas) return;
+      const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, A4_MM.w, A4_MM.h);
+      pdf.save("collage-a4.pdf");
+    });
+  </script>
+</body>
+</html>

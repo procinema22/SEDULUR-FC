@@ -1,0 +1,102 @@
+body {
+    font-family: "Poppins", sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f8f9fc;
+    color: #333;
+  }
+  
+  .container {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+  }
+  
+  h1 {
+    text-align: center;
+    font-weight: 600;
+    color: #222;
+  }
+  
+  p {
+    text-align: center;
+    font-size: 15px;
+    color: #666;
+  }
+  
+  .controls {
+    text-align: center;
+    margin: 20px 0;
+  }
+  
+  select, input[type="file"], button {
+    font-family: inherit;
+    margin: 8px;
+    padding: 8px 14px;
+    font-size: 15px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+  }
+  
+  button {
+    background: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+  
+  button:hover {
+    background: #0056b3;
+  }
+  
+  .grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+  
+  .grid img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+  }
+  
+  .preview {
+    text-align: center;
+    margin-top: 20px;
+  }
+  
+  .preview img {
+    width: 100%;
+    max-width: 600px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+  }
+  
+  @media (max-width: 600px) {
+    .container {
+      margin: 10px;
+      padding: 15px;
+    }
+  
+    h1 {
+      font-size: 18px;
+    }
+  
+    .grid img {
+      width: 60px;
+      height: 60px;
+    }
+  
+    button {
+      width: 100%;
+    }
+  }
+  
