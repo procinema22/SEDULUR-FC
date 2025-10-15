@@ -1,153 +1,149 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>A4 Photo Collage Generator</title>
-
-  <!-- Import Google Font Poppins -->
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-
-  <!-- Hubungkan CSS -->
-  <link rel="stylesheet" href="style.css">
-
-  <!-- jsPDF -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kolase Foto A4 Otomatis (Kiri Atas + Margin)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  body { font-family: sans-serif; text-align: center; margin: 20px; }
+  canvas { border: 1px solid #ccc; margin-top: 10px; max-width: 90%; height: auto; background: white; }
+  select, input, button { margin: 5px; padding: 6px 10px; font-size: 15px; }
+</style>
 </head>
-
 <body>
-  <div class="container">
-    <h1>A4 Photo Collage Generator</h1>
-    <p>Buat kolase foto ukuran 3x4, 2x3, atau 4x6 cm di atas kertas A4 dengan jarak 2 mm.</p>
 
-    <div class="controls">
-      <label for="size">Pilih ukuran foto:</label>
-      <select id="size">
-        <option value="3x4">3x4 cm</option>
-        <option value="2x3">2x3 cm</option>
-        <option value="4x6">4x6 cm</option>
-      </select>
+<h2>KOLASE FOTO A4 OTOMATIS (Mulai dari Kiri Atas + Margin Cetak)</h2>
 
-      <input type="file" id="fileInput" accept="image/*" multiple>
-      <div class="buttons">
-        <button id="previewBtn">Buat Preview</button>
-        <button id="downloadBtn">Download PDF A4</button>
-      </div>
-    </div>
+<label>Ukuran foto:</label>
+<select id="photoSize">
+  <option value="2x3">2x3 cm</option>
+  <option value="3x4">3x4 cm</option>
+  <option value="4x6">4x6 cm</option>
+</select>
 
-    <h3>Gambar yang diunggah:</h3>
-    <div class="grid" id="thumbs"></div>
+<label>Margin (mm):</label>
+<input type="number" id="margin" value="5" min="0" max="20" style="width:60px">
 
-    <h3>Preview Hasil:</h3>
-    <div class="preview" id="preview"></div>
-  </div>
+<input type="file" id="fileInput" multiple accept="image/*">
+<button id="generate">Buat Kolase</button>
+<button id="download">Download PDF</button>
 
-  <script>
-    const { jsPDF } = window.jspdf;
-    const A4_MM = { w: 210, h: 297 };
-    const DPI = 300;
-    const MM_PER_INCH = 25.4;
-    const spacingMm = 2;
-    let images = [];
+<canvas id="canvas" width="2480" height="3508"></canvas>
+<p><small>A4 = 2480 × 3508 px @300 DPI</small></p>
 
-    document.getElementById("fileInput").addEventListener("change", (e) => {
-      images = [];
-      const files = Array.from(e.target.files);
-      const thumbs = document.getElementById("thumbs");
-      thumbs.innerHTML = "";
-      files.forEach(file => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          images.push(reader.result);
-          const img = document.createElement("img");
-          img.src = reader.result;
-          thumbs.appendChild(img);
-        };
-        reader.readAsDataURL(file);
-      });
-    });
+<script>
+const fileInput = document.getElementById("fileInput");
+const generateBtn = document.getElementById("generate");
+const downloadBtn = document.getElementById("download");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+let pages = [];
 
-    function mmToPx(mm) { return Math.round((mm / MM_PER_INCH) * DPI); }
-    function cmToPx(cm) { return mmToPx(cm * 10); }
+const mmToPx = mm => Math.round(mm * 11.811); // konversi mm → pixel (300 DPI)
 
-    function computeCoverCrop(imgW, imgH, targetW, targetH) {
-      const imgRatio = imgW / imgH;
-      const targetRatio = targetW / targetH;
-      if (imgRatio > targetRatio) {
-        const sHeight = imgH;
-        const sWidth = imgH * targetRatio;
-        return { sx: (imgW - sWidth) / 2, sy: 0, sWidth, sHeight };
+// Crop tengah supaya tidak gepeng
+function drawImageCover(ctx, img, x, y, w, h) {
+  const iw = img.width, ih = img.height;
+  const ir = iw / ih, tr = w / h;
+  let sx, sy, sw, sh;
+  if (ir > tr) {
+    sh = ih;
+    sw = ih * tr;
+    sx = (iw - sw) / 2;
+    sy = 0;
+  } else {
+    sw = iw;
+    sh = iw / tr;
+    sx = 0;
+    sy = (ih - sh) / 2;
+  }
+  ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+}
+
+// Auto-rotate jika landscape
+async function loadImageRotated(file) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      if (img.width > img.height) {
+        const off = document.createElement("canvas");
+        off.width = img.height;
+        off.height = img.width;
+        const octx = off.getContext("2d");
+        octx.translate(off.width / 2, off.height / 2);
+        octx.rotate(-Math.PI / 2);
+        octx.drawImage(img, -img.width / 2, -img.height / 2);
+        const rotated = new Image();
+        rotated.onload = () => resolve(rotated);
+        rotated.src = off.toDataURL("image/jpeg");
       } else {
-        const sWidth = imgW;
-        const sHeight = imgW / targetRatio;
-        return { sx: 0, sy: (imgH - sHeight) / 2, sWidth, sHeight };
+        resolve(img);
       }
-    }
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
 
-    async function renderCollage() {
-      if (images.length === 0) { alert("Upload minimal 1 gambar."); return; }
+generateBtn.onclick = async () => {
+  const size = document.getElementById("photoSize").value;
+  const marginMM = parseFloat(document.getElementById("margin").value) || 0;
+  const margin = mmToPx(marginMM);
 
-      const size = document.getElementById("size").value;
-      const [wCm, hCm] = size.split("x").map(Number);
-      const canvasW = mmToPx(A4_MM.w);
-      const canvasH = mmToPx(A4_MM.h);
-      const spacingPx = mmToPx(spacingMm);
-      const photoWpx = cmToPx(wCm);
-      const photoHpx = cmToPx(hCm);
+  let [w, h] = size === "2x3" ? [20, 30] : size === "3x4" ? [30, 40] : [40, 60];
+  const space = 2; // jarak antar foto dalam mm
+  const imgW = mmToPx(w);
+  const imgH = mmToPx(h);
+  const gap = mmToPx(space);
 
-      const cols = Math.floor((canvasW + spacingPx) / (photoWpx + spacingPx));
-      const rows = Math.floor((canvasH + spacingPx) / (photoHpx + spacingPx));
+  const files = [...fileInput.files];
+  if (files.length === 0) return alert("Pilih foto terlebih dahulu.");
 
-      const canvas = document.createElement("canvas");
-      canvas.width = canvasW;
-      canvas.height = canvasH;
-      const ctx = canvas.getContext("2d");
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(0, 0, canvasW, canvasH);
+  const images = await Promise.all(files.map(loadImageRotated));
 
-      const usedW = cols * photoWpx + (cols - 1) * spacingPx;
-      const usedH = rows * photoHpx + (rows - 1) * spacingPx;
-      const offsetX = Math.round((canvasW - usedW) / 2);
-      const offsetY = Math.round((canvasH - usedH) / 2);
+  pages = [];
+  const usableW = canvas.width - margin * 2;
+  const usableH = canvas.height - margin * 2;
+  const cols = Math.floor((usableW + gap) / (imgW + gap));
+  const rows = Math.floor((usableH + gap) / (imgH + gap));
+  const perPage = cols * rows;
+  const totalPages = Math.ceil(images.length / perPage);
 
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          const imgSrc = images[(r * cols + c) % images.length];
-          const img = await loadImage(imgSrc);
-          const { sx, sy, sWidth, sHeight } = computeCoverCrop(img.width, img.height, photoWpx, photoHpx);
-          const x = offsetX + c * (photoWpx + spacingPx);
-          const y = offsetY + r * (photoHpx + spacingPx);
-          ctx.drawImage(img, sx, sy, sWidth, sHeight, x, y, photoWpx, photoHpx);
-        }
-      }
-      return canvas;
-    }
+  for (let p = 0; p < totalPages; p++) {
+    ctx.fillStyle = "white";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    function loadImage(src) {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = src;
-      });
-    }
+    const pageImgs = images.slice(p * perPage, (p + 1) * perPage);
 
-    document.getElementById("previewBtn").addEventListener("click", async () => {
-      const canvas = await renderCollage();
-      if (!canvas) return;
-      document.getElementById("preview").innerHTML = "";
-      const img = document.createElement("img");
-      img.src = canvas.toDataURL("image/jpeg", 0.9);
-      document.getElementById("preview").appendChild(img);
+    // posisi mulai kiri atas sesuai margin
+    const startX = margin;
+    const startY = margin;
+
+    pageImgs.forEach((img, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x = startX + col * (imgW + gap);
+      const y = startY + row * (imgH + gap);
+      drawImageCover(ctx, img, x, y, imgW, imgH);
     });
 
-    document.getElementById("downloadBtn").addEventListener("click", async () => {
-      const canvas = await renderCollage();
-      if (!canvas) return;
-      const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-      pdf.addImage(canvas.toDataURL("image/jpeg", 0.9), "JPEG", 0, 0, A4_MM.w, A4_MM.h);
-      pdf.save("collage-a4.pdf");
-    });
-  </script>
+    pages.push(canvas.toDataURL("image/jpeg", 1.0));
+  }
+
+  alert(`Kolase selesai dibuat (${pages.length} halaman).`);
+};
+
+downloadBtn.onclick = () => {
+  if (pages.length === 0) return alert("Buat kolase dulu.");
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  pages.forEach((img, i) => {
+    if (i > 0) pdf.addPage();
+    pdf.addImage(img, "JPEG", 0, 0, 210, 297);
+  });
+  pdf.save("kolase_foto_a4_kiriatas.pdf");
+};
+</script>
+
 </body>
 </html>
