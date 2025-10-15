@@ -13,7 +13,7 @@
     margin: 20px;
     background: var(--bg);
     color: var(--text);
-    transition: 0.3s;
+    transition: background 0.3s, color 0.3s;
   }
 
   :root {
@@ -69,7 +69,6 @@
   }
 
   .copy-input {
-    display: none;
     margin-top: 8px;
   }
 </style>
@@ -122,20 +121,30 @@ const generateBtn = document.getElementById("generate");
 const downloadBtn = document.getElementById("download");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-const copyInputGroup = document.getElementById("copyInputGroup");
 const themeToggle = document.getElementById("themeToggle");
 let pages = [];
 
-// 🌗 Mode Gelap/Terang
+// 🌗 MODE GELAP PERMANEN
+function applyThemeFromStorage() {
+  const savedTheme = localStorage.getItem("theme");
+  if (savedTheme === "dark") {
+    document.body.classList.add("dark");
+    themeToggle.textContent = "☀️ Mode Terang";
+  } else {
+    document.body.classList.remove("dark");
+    themeToggle.textContent = "🌙 Mode Gelap";
+  }
+}
+applyThemeFromStorage();
+
 themeToggle.onclick = () => {
-  document.body.classList.toggle("dark");
-  themeToggle.textContent = document.body.classList.contains("dark")
-    ? "☀️ Mode Terang"
-    : "🌙 Mode Gelap";
+  const isDark = document.body.classList.toggle("dark");
+  localStorage.setItem("theme", isDark ? "dark" : "light");
+  themeToggle.textContent = isDark ? "☀️ Mode Terang" : "🌙 Mode Gelap";
 };
 
 // Konversi mm ke pixel
-const mmToPx = mm => Math.round(mm * 11.811); // 1mm = 11.811px @300DPI
+const mmToPx = mm => Math.round(mm * 11.811);
 
 // Fungsi crop agar gambar pas
 function drawImageCover(ctx, img, x, y, w, h) {
@@ -180,16 +189,6 @@ async function loadImageRotated(file) {
   });
 }
 
-// Mode duplicate tampilkan input
-document.querySelectorAll('input[name="mode"]').forEach(radio => {
-  radio.addEventListener("change", () => {
-    copyInputGroup.style.display =
-      document.querySelector('input[name="mode"]:checked').value === "duplicate"
-        ? "block"
-        : "none";
-  });
-});
-
 // Generate kolase
 generateBtn.onclick = async () => {
   const size = document.getElementById("photoSize").value;
@@ -218,10 +217,16 @@ generateBtn.onclick = async () => {
   const perPage = cols * rows;
 
   let photoList = [];
+
   if (mode === "duplicate") {
     for (let i = 0; i < copyCount; i++) photoList.push(images[0]);
   } else {
-    photoList = [...images];
+    // 🔹 Jika foto berbeda, gandakan setiap foto sesuai copyCount
+    images.forEach(img => {
+      for (let i = 0; i < copyCount; i++) {
+        photoList.push(img);
+      }
+    });
   }
 
   const totalPages = Math.ceil(photoList.length / perPage);
@@ -230,54 +235,33 @@ generateBtn.onclick = async () => {
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 🔹 Tambahkan crop marks (garis potong)
+    // 🔹 Garis potong
     const cropLen = mmToPx(5);
     ctx.strokeStyle = "#888";
     ctx.lineWidth = 1;
 
-    // kiri atas
-    ctx.beginPath();
-    ctx.moveTo(margin - cropLen, margin);
-    ctx.lineTo(margin, margin);
-    ctx.moveTo(margin, margin - cropLen);
-    ctx.lineTo(margin, margin);
-    ctx.stroke();
+    // empat sudut
+    const drawCrop = (x, y) => {
+      ctx.beginPath();
+      ctx.moveTo(x - cropLen, y);
+      ctx.lineTo(x, y);
+      ctx.moveTo(x, y - cropLen);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    };
+    drawCrop(margin, margin);
+    drawCrop(canvas.width - margin, margin);
+    drawCrop(margin, canvas.height - margin);
+    drawCrop(canvas.width - margin, canvas.height - margin);
 
-    // kanan atas
-    ctx.beginPath();
-    ctx.moveTo(canvas.width - margin + cropLen, margin);
-    ctx.lineTo(canvas.width - margin, margin);
-    ctx.moveTo(canvas.width - margin, margin - cropLen);
-    ctx.lineTo(canvas.width - margin, margin);
-    ctx.stroke();
-
-    // kiri bawah
-    ctx.beginPath();
-    ctx.moveTo(margin - cropLen, canvas.height - margin);
-    ctx.lineTo(margin, canvas.height - margin);
-    ctx.moveTo(margin, canvas.height - margin + cropLen);
-    ctx.lineTo(margin, canvas.height - margin);
-    ctx.stroke();
-
-    // kanan bawah
-    ctx.beginPath();
-    ctx.moveTo(canvas.width - margin + cropLen, canvas.height - margin);
-    ctx.lineTo(canvas.width - margin, canvas.height - margin);
-    ctx.moveTo(canvas.width - margin, canvas.height - margin + cropLen);
-    ctx.lineTo(canvas.width - margin, canvas.height - margin);
-    ctx.stroke();
-
-    // 🔹 Nama pelanggan di pojok kanan atas (aman dari potong)
+    // 🔹 Nama pelanggan
     ctx.font = "bold 60px Poppins";
-ctx.fillStyle = "black";
-const textWidth = ctx.measureText(customerName).width;
-const safeMargin = mmToPx(10);
-ctx.fillText(
-  customerName,
-  canvas.width - textWidth - safeMargin,
-  canvas.height - safeMargin
-);
-    // 🔹 Gambar foto-foto
+    ctx.fillStyle = "black";
+    const textWidth = ctx.measureText(customerName).width;
+    const safeMargin = mmToPx(10);
+    ctx.fillText(customerName, canvas.width - textWidth - safeMargin, canvas.height - safeMargin);
+
+    // 🔹 Gambar foto
     const pageImgs = photoList.slice(p * perPage, (p + 1) * perPage);
     const startX = margin;
     const startY = margin + 50;
