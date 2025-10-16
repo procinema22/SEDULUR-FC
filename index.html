@@ -182,7 +182,7 @@ function drawImageCover(ctx, img, x, y, w, h) {
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
 
   // Tambahkan border 1 mm
-  const borderPx = mmToPx(1);
+  const borderPx = mmToPx(0,1);
   ctx.lineWidth = borderPx;
   ctx.strokeStyle = "black";
   ctx.strokeRect(x, y, w, h);
