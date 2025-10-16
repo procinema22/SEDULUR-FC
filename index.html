@@ -161,7 +161,7 @@ themeToggle.onclick = () => {
 // Konversi mm ke pixel
 const mmToPx = mm => Math.round(mm * 11.811);
 
-// Fungsi crop agar gambar pas
+// Fungsi crop agar gambar pas + border
 function drawImageCover(ctx, img, x, y, w, h) {
   const iw = img.width, ih = img.height;
   const ir = iw / ih, tr = w / h;
@@ -177,7 +177,15 @@ function drawImageCover(ctx, img, x, y, w, h) {
     sx = 0;
     sy = (ih - sh) / 2;
   }
+
+  // Gambar foto
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+
+  // Tambahkan border 1 mm
+  const borderPx = mmToPx(1);
+  ctx.lineWidth = borderPx;
+  ctx.strokeStyle = "black";
+  ctx.strokeRect(x, y, w, h);
 }
 
 // Rotasi otomatis
@@ -262,7 +270,6 @@ generateBtn.onclick = async () => {
     const cropLen = mmToPx(5);
     ctx.strokeStyle = "#888";
     ctx.lineWidth = 1;
-
     const drawCrop = (x, y) => {
       ctx.beginPath();
       ctx.moveTo(x - cropLen, y);
@@ -283,7 +290,7 @@ generateBtn.onclick = async () => {
     const safeMargin = mmToPx(10);
     ctx.fillText(customerName, canvas.width - textWidth - safeMargin, canvas.height - safeMargin);
 
-    // Gambar foto
+    // Gambar foto + border
     const pageImgs = photoList.slice(p * perPage, (p + 1) * perPage);
     const startX = margin;
     const startY = margin + 50;
