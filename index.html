@@ -80,9 +80,6 @@
 
 <label>Nama pelanggan:</label>
 <input type="text" id="customerName" placeholder="Masukkan nama" style="width:200px">
-<button id="printBtn">🖨️ Print Kolase</button>
-
-
 <br>
 
 <label>Ukuran foto:</label>
@@ -113,6 +110,13 @@
 
 <button id="generate">Buat Kolase</button>
 <button id="download">Download PDF</button>
+<br><br>
+
+<!-- 🔹 Tambahkan kontrol printer -->
+<select id="printerList">
+  <option value="">(Memuat daftar printer...)</option>
+</select>
+<button id="autoPrint">🖨️ Print Langsung</button>
 
 <canvas id="canvas" width="2480" height="3508"></canvas>
 <p><small>A4 = 2480 × 3508 px @300 DPI</small></p>
@@ -124,9 +128,11 @@ const downloadBtn = document.getElementById("download");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 const themeToggle = document.getElementById("themeToggle");
+const autoPrintBtn = document.getElementById("autoPrint");
+const printerList = document.getElementById("printerList");
 let pages = [];
 
-// 🌗 MODE GELAP PERMANEN
+// 🌗 MODE GELAP
 function applyThemeFromStorage() {
   const savedTheme = localStorage.getItem("theme");
   if (savedTheme === "dark") {
@@ -223,7 +229,6 @@ generateBtn.onclick = async () => {
   if (mode === "duplicate") {
     for (let i = 0; i < copyCount; i++) photoList.push(images[0]);
   } else {
-    // 🔹 Jika foto berbeda, gandakan setiap foto sesuai copyCount
     images.forEach(img => {
       for (let i = 0; i < copyCount; i++) {
         photoList.push(img);
@@ -237,12 +242,11 @@ generateBtn.onclick = async () => {
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 🔹 Garis potong
+    // Garis potong
     const cropLen = mmToPx(5);
     ctx.strokeStyle = "#888";
     ctx.lineWidth = 1;
 
-    // empat sudut
     const drawCrop = (x, y) => {
       ctx.beginPath();
       ctx.moveTo(x - cropLen, y);
@@ -256,14 +260,14 @@ generateBtn.onclick = async () => {
     drawCrop(margin, canvas.height - margin);
     drawCrop(canvas.width - margin, canvas.height - margin);
 
-    // 🔹 Nama pelanggan
+    // Nama pelanggan
     ctx.font = "bold 60px Poppins";
     ctx.fillStyle = "black";
     const textWidth = ctx.measureText(customerName).width;
     const safeMargin = mmToPx(10);
     ctx.fillText(customerName, canvas.width - textWidth - safeMargin, canvas.height - safeMargin);
 
-    // 🔹 Gambar foto
+    // Gambar foto
     const pageImgs = photoList.slice(p * perPage, (p + 1) * perPage);
     const startX = margin;
     const startY = margin + 50;
@@ -292,6 +296,39 @@ downloadBtn.onclick = () => {
     pdf.addImage(img, "JPEG", 0, 0, 210, 297);
   });
   pdf.save("kolase_foto_a4.pdf");
+};
+
+// 🔹 Ambil daftar printer dari server
+async function loadPrinters() {
+  try {
+    const res = await fetch("http://localhost:3000/printers");
+    const data = await res.json();
+    printerList.innerHTML = data.map(p => `<option value="${p.name}">${p.name}</option>`).join("");
+  } catch (e) {
+    printerList.innerHTML = `<option value="">(Tidak ada printer ditemukan)</option>`;
+  }
+}
+loadPrinters();
+
+// 🔹 Kirim hasil ke printer
+autoPrintBtn.onclick = async () => {
+  if (pages.length === 0) return alert("Buat kolase dulu.");
+  const printerName = printerList.value;
+  if (!printerName) return alert("Pilih printer terlebih dahulu.");
+
+  const formData = new FormData();
+  for (let i = 0; i < pages.length; i++) {
+    const blob = await (await fetch(pages[i])).blob();
+    formData.append("pages", blob, `page${i + 1}.jpg`);
+  }
+
+  const res = await fetch(`http://localhost:3000/print?printer=${encodeURIComponent(printerName)}`, {
+    method: "POST",
+    body: formData,
+  });
+
+  const msg = await res.text();
+  alert(msg);
 };
 </script>
 
