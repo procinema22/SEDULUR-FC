@@ -87,6 +87,14 @@
   <option value="2x3">2x3 cm</option>
   <option value="3x4">3x4 cm</option>
   <option value="4x6">4x6 cm</option>
+  <option value="5x6">5x6 cm</option>
+  <option value="6x5">6x5 cm</option>
+  <option value="5x7">5x7 cm</option>
+  <option value="9x13">9x13 cm (3R)</option>
+  <option value="10x15">10x15 cm (4R)</option>
+  <option value="13x18">13x18 cm (5R)</option>
+  <option value="20x25">20x25 cm (8R)</option>
+  <option value="a4">Full A4 (21x29.7 cm)</option>
 </select>
 
 <label>Margin (mm):</label>
@@ -112,7 +120,6 @@
 <button id="download">Download PDF</button>
 <br><br>
 
-<!-- 🔹 Tambahkan kontrol printer -->
 <select id="printerList">
   <option value="">(Memuat daftar printer...)</option>
 </select>
@@ -206,18 +213,31 @@ generateBtn.onclick = async () => {
   const copyCount = parseInt(document.getElementById("copyCount").value) || 1;
   const customerName = document.getElementById("customerName").value.trim() || "Tanpa Nama";
 
-  let [w, h] = size === "2x3" ? [20, 30] : size === "3x4" ? [30, 40] : [40, 60];
-  const space = 2;
+  let w, h;
+  switch (size) {
+    case "2x3": [w, h] = [20, 30]; break;
+    case "3x4": [w, h] = [30, 40]; break;
+    case "4x6": [w, h] = [40, 60]; break;
+    case "5x6": [w, h] = [50, 60]; break;
+    case "6x5": [w, h] = [60, 50]; break;
+    case "5x7": [w, h] = [50, 70]; break;
+    case "9x13": [w, h] = [90, 130]; break;
+    case "10x15": [w, h] = [100, 150]; break;
+    case "13x18": [w, h] = [130, 180]; break;
+    case "20x25": [w, h] = [200, 250]; break;
+    case "a4": [w, h] = [210, 297]; break;
+    default: [w, h] = [30, 40];
+  }
+
   const imgW = mmToPx(w);
   const imgH = mmToPx(h);
-  const gap = mmToPx(space);
-
+  const gap = mmToPx(2);
   const files = [...fileInput.files];
   if (files.length === 0) return alert("Pilih foto terlebih dahulu.");
 
   const images = await Promise.all(files.map(loadImageRotated));
-
   pages = [];
+
   const usableW = canvas.width - margin * 2;
   const usableH = canvas.height - margin * 2;
   const cols = Math.floor((usableW + gap) / (imgW + gap));
@@ -225,19 +245,15 @@ generateBtn.onclick = async () => {
   const perPage = cols * rows;
 
   let photoList = [];
-
   if (mode === "duplicate") {
     for (let i = 0; i < copyCount; i++) photoList.push(images[0]);
   } else {
     images.forEach(img => {
-      for (let i = 0; i < copyCount; i++) {
-        photoList.push(img);
-      }
+      for (let i = 0; i < copyCount; i++) photoList.push(img);
     });
   }
 
   const totalPages = Math.ceil(photoList.length / perPage);
-
   for (let p = 0; p < totalPages; p++) {
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -298,7 +314,7 @@ downloadBtn.onclick = () => {
   pdf.save("kolase_foto_a4.pdf");
 };
 
-// 🔹 Ambil daftar printer dari server
+// Ambil daftar printer
 async function loadPrinters() {
   try {
     const res = await fetch("http://localhost:3000/printers");
@@ -310,7 +326,7 @@ async function loadPrinters() {
 }
 loadPrinters();
 
-// 🔹 Kirim hasil ke printer
+// Kirim ke printer
 autoPrintBtn.onclick = async () => {
   if (pages.length === 0) return alert("Buat kolase dulu.");
   const printerName = printerList.value;
